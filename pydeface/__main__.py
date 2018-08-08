@@ -112,17 +112,21 @@ def main():
     flirt.inputs.reference = infile
     flirt.inputs.out_file = tmpfile
     flirt.inputs.out_matrix_file = tmpmat2
+    flirt.inputs.interp = 'nearestneighbour'
     flirt.run()
 
     # multiply mask by infile and save
     infile_img = load(infile)
-    tmpfile_img = load(tmpfile)
+    warped_mask_img = load(tmpfile)
     try:
-        outdata = infile_img.get_data().squeeze() * tmpfile_img.get_data()
+        warped_mask_data = warped_mask_img.get_data()
+        outdata = infile_img.get_data().squeeze()
     except ValueError:
-        tmpdata = np.stack([tmpfile_img.get_data()]*infile_img.get_data().shape[-1], axis=-1)
-        outdata = infile_img.get_data() * tmpdata
-    
+        warped_mask_data = np.stack([warped_mask_img.get_data()]*infile_img.get_data().shape[-1], axis=-1)
+        outdata = infile_img.get_data()
+
+    outdata[warped_mask_data == 1] = 0
+
     outfile_img = Nifti1Image(outdata, infile_img.get_affine(),
                               infile_img.get_header())
     outfile_img.to_filename(outfile)
@@ -133,7 +137,8 @@ def main():
         print("Defacing mask also applied to:")
         for applyfile in args.applyto:
             applyfile_img = load(applyfile)
-            outdata = applyfile_img.get_data() * tmpfile_img.get_data()
+            outdata = applyfile_img.get_data()
+            outdata[warped_mask_data == 1] = 0
             applyfile_img = Nifti1Image(outdata, applyfile_img.get_affine(),
                                         applyfile_img.get_header())
             outfile = output_checks(applyfile)
